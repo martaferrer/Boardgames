@@ -8,6 +8,7 @@ import re
 import numpy as np
 import math
 import pickle
+import os
 
 class BoardgameRecommender:
     def __init__(self, number=900):
@@ -21,6 +22,7 @@ class BoardgameRecommender:
             """
         self.boardgames_data = []
         self.number = number
+        self.root_path = os.path.dirname(os.path.abspath(__file__))
         #self.scrape_boardgames()
 
     def scrape_boardgames(self):
@@ -29,12 +31,14 @@ class BoardgameRecommender:
         '''
         # create dataframe
         df_columns = ['Board Game Rank', 'Title', 'Year', 'Description', 'Geek Rating', 'Avg Rating', 'Num Voters', \
-            'Num Players Min', 'Num Players Max', 'Best Num Players Min', 'Best Num Players Max', 'Playtime min', 'Playtime May', \
-            'Player Min Age', 'Language Dependence', 'Weight', 'Designer']
+            'Num Players Min', 'Num Players Max', 'Best Num Players Min', 'Best Num Players Max', 'Playtime Min', 'Playtime Max', \
+            'Player Min Age', 'Language Dependence', 'Weight', 'Category', 'Designer']
 
         self.boardgames_data = pd.DataFrame(columns=df_columns)
 
-        for page in range(1, 11):
+        # there are 100 games per page
+        num_pages = math.ceil(self.number/100)
+        for page in range(1, num_pages):
 
             # Step 1: Sending a HTTP request to a URL
             r = requests.get("https://boardgamegeek.com/browse/boardgame/page/"+str(page))
@@ -65,13 +69,23 @@ class BoardgameRecommender:
                         boardgame.append(table.text.replace('\t', ' ').replace('\n',' ').strip())
                     #elif(heading == headings[1]): # thumbnail image
                     elif(heading == headings[2]): # Title
-                        boardgame.append(table.text.replace('\t', ' ').replace('\n',' ').split('(')[0].strip())
-                        boardgame.append(table.text.replace('\t', ' ').replace('\n',' ').split('(')[1].split(')')[0])
-                        boardgame.append(table.text.replace('\t', ' ').replace('\n',' ').split('(')[1].split(')')[1].strip())
+                        
+                        try:
+                            # we assume there is the year in parenthesis next to the title
+                            boardgame.append(table.text.replace('\t', ' ').replace('\n',' ').split('(')[0].strip())
+                            boardgame.append(table.text.replace('\t', ' ').replace('\n',' ').split('(')[1].split(')')[0])
+                            boardgame.append(table.text.replace('\t', ' ').replace('\n',' ').split('(')[1].split(')')[1].strip())
+                        except:
+                            # is there no title? is that too specific?
+                            del boardgame[1] # delete the title
+                            boardgame.append(table.text.split('\t')[0].replace('\n', ''))
+                            boardgame.append(math.nan)
+                            boardgame.append(table.text.split('\t')[-3].replace('\n', ''))
+
+                        
                         # get link of the boardgame
                         boargame_link = table.find_all('a', href=True)[0]
-                        print(boargame_link.attrs['href'])
-                    elif(heading == headings[3]): # Geek Rating
+                    elif(heading == headings[3]): # Geaek Rating
                         boardgame.append(table.text.replace('\t', ' ').replace('\n',' ').strip())
                     elif(heading == headings[4]): # Avg Rating
                         boardgame.append(table.text.replace('\t', ' ').replace('\n',' ').strip())
@@ -104,83 +118,191 @@ class BoardgameRecommender:
         # title of the webpage
         print(game_page.title.text)
 
-        desc_tag = game_page.find_all('meta',{'property':'og:description'})
-        desc_str = str(desc_tag).split('>',1)[0][16:-27].replace('&amp;ldquo;','"')\
-            .replace('&amp;rdquo;','"').replace('\n',' ')
-        print(desc_str)
+        #desc_tag = game_page.find_all('meta',{'property':'og:description'})
+        #desc_str = str(desc_tag).split('>',1)[0][16:-27].replace('&amp;ldquo;','"')\
+        #    .replace('&amp;rdquo;','"').replace('\n',' ')
 
         #manipulate js script data and create dictionaries for attribute look up
         script = game_page.find("script", text=re.compile("GEEK.geekitemPreload\s+="))
 
         # recommended number of players
-        players_min = str(script).split('"minplayers":"')[1].split('",')[0]
-        players_max = str(script).split('"maxplayers":"')[1].split('",')[0]
-    
+        try:
+            players_min = str(script).split('"minplayers":"')[1].split('",')[0]
+            players_max = str(script).split('"maxplayers":"')[1].split('",')[0]
+        except:
+            print('Number of players not found')
+            players_min = math.nan
+            players_max = math.nan
+            
         # best of user players
         try:
             best_num_players = str(script).split('userplayers":{"best":[')[1].split("]")[0]
             best_num_players_min = best_num_players.split('{"min":')[1].split(',')[0]
         except:
-            print('Best number of players not found ')
+            print('Best number of min players not found ')
             best_num_players_min = math.nan
 
         try:
             best_num_players = str(script).split('userplayers":{"best":[')[1].split("]")[0]
             best_num_players_max = best_num_players.split('"max":')[1].split('}')[0]  
         except:
-            print('Best number of players not found ')
+            print('Best number of max players not found ')
             best_num_players_max = math.nan
 
         # playing time
-        playtime_min = str(script).split('"minplaytime":"')[1].split('",')[0]
-        playtime_max = str(script).split('"maxplaytime":"')[1].split('",')[0]
+        try:
+            playtime_min = str(script).split('"minplaytime":"')[1].split('",')[0]
+            playtime_max = str(script).split('"maxplaytime":"')[1].split('",')[0]
+        except:
+            print('Playtime not found ')
+            playtime_min = math.nan
+            playtime_max = math.nan
 
         # player age
-        player_age = str(script).split('"minage":"')[1].split('",')[0]
+        try:
+            player_age = str(script).split('"minage":"')[1].split('",')[0]
+        except:
+            print('Min player age not found ')
+            player_age = math.nan
 
         # language dependence
-        language_dependence = str(script).split('"languagedependence":"')[1].split('",')[0]
+        try:
+            language_dependence = str(script).split('"languagedependence":"')[1].split('",')[0]
+        except:
+            print('Language dependence not found ')
+            language_dependence = math.nan
 
         # boargame weight (complexity rating)
-        boardgame_weight = str(script).split('"averageweight":')[1].split(',"')[0]
-
+        try:
+            boardgame_weight = str(script).split('"averageweight":')[1].split(',"')[0]
+        except:
+            print('Complexity weight not found ')
+            boardgame_weight = math.nan
+            
         # board game designer
         try:
             designer = str(script).split('"boardgamedesigner":[{"name":"')[1].split('","')[0]
         except:
             print('Designer not found')
             designer = math.nan
+
+        # boardgame category
+        category_tags = str(script).split('"veryshortprettyname":"')
+        cat_list = []
+        for index, category in enumerate(category_tags):
+            # ignoring the first two indeces
+            # index[0] -> <script> tag..
+            # index[1] -> Overall -> present in all games
+            if (category.split('","')[0] not in cat_list) & (index > 1):
+                cat_list.append(category.split('","')[0])
+        categories_str = ' | '.join([str(elem) for elem in cat_list])
+            
     
         game_characteristics = [players_min, players_max, best_num_players_min, best_num_players_max, \
-            playtime_min, playtime_max, player_age, language_dependence, boardgame_weight, designer]
+            playtime_min, playtime_max, player_age, language_dependence, boardgame_weight, categories_str, designer]
 
         return game_characteristics
 
-    def get_attributes(self, name):
-
+    def get_boardgame_attrs(self, name):
+        '''
+        '''
         try:
-            self.boardgames_data[self.boardgames_data['Title'] == name]
+            boardgame_details = self.boardgames_data[self.boardgames_data['Title'].str.contains(name, case=False, na=False, regex=False)]
         except:
             print('ERROR - Boardgame {} not found'.format(name))
+        
+        if(len(boardgame_details) != 0):
+            print(boardgame_details)
+        else:
+            print('ERROR - Boardgame {} not found'.format(name))
 
-    def save_as_csv(self, output_name='boardgame_data.csv'):
+        return boardgame_details
+
+    def save_as_csv(self, output_name='data\\boardgame_data.csv'):
         '''
         '''
+
+        file_abs_path = self.root_path + '\\' + output_name
 
         # Export the data to csv
-        self.boardgames_data.to_csv(output_name)
+        self.boardgames_data.to_csv(file_abs_path)
     
-    def save_as_pickle(self, output_name = 'boardgame_data.pickle'):
+    def save_as_pickle(self, output_name = 'data\\boardgame_data.pickle'):
         '''
         '''
+
+        file_abs_path = self.root_path + '\\' + output_name
 
         # Export the data to pickle
-        self.boardgames_data.to_pickle(output_name)
+        self.boardgames_data.to_pickle(file_abs_path)
+    
+    def read_pickle(self, file = 'data\\boardgame_data.pickle'):
+        
+        file_abs_path = self.root_path + '\\' + file
+
+        # overwrite data
+        self.boardgames_data = pd.read_pickle(file_abs_path)
+
+        self.number = self.boardgames_data.shape[0]
+        print('Reading boardgame database containing {} entries'.format(self.number))
 
 
-my_instance = BoardgameRecommender()
+    def popular_boardgames(self, n_top):
+        '''
+        INPUT:
+        n_top - an integer of the number recommendations you want back
+        OUTPUT:
+        top_boardgames - a list of the n_top ranked boardgames by title in order best to worst
+        '''
+
+        top_boardgames = list(self.boardgames_data['Title'][:n_top])
+
+        return top_boardgames  # a list of the n_top movies as recommended
+
+    def popular_recs_filtered(self, n_top, num_players=None, playing_time=None, genres=None):
+        '''
+        REDO THIS DOC STRING
+
+        INPUT:
+        n_top - an integer of the number recommendations you want back
+        //ranked_movies - a pandas dataframe of the already ranked movies based on avg rating, count, and time
+        num_players - a list of strings with years of movies
+        playing_time - an integer of the approximate game duration
+        genres - a list of strings with genres of boardgames
+
+        OUTPUT:
+        top_movies - a list of the n_top recommended boardgames by title in order best to worst
+        '''
+
+        filtered_boardgames = self.boardgames_data.copy(deep=True)
+
+        # Filter movies based on year and genre
+        if num_players is not None:
+            filtered_boardgames = filtered_boardgames[\
+                (filtered_boardgames['Num Players Min'].astype(int) <= num_players) &\
+                     (filtered_boardgames['Num Players Max'].astype(int) >= num_players)]
+
+        if playing_time is not None:
+            filtered_boardgames = filtered_boardgames[\
+                #(filtered_boardgames['Playtime Min'].astype(int) <= playing_time) &\
+                    filtered_boardgames['Playtime Max'].astype(int) <= playing_time]
+
+        # create top movies list
+        top_boardgames = list(filtered_boardgames['Title'][:n_top])
+
+        return top_boardgames
+
+my_instance = BoardgameRecommender(5000)
 my_instance.scrape_boardgames()
-my_instance.get_attributes(name='Scrawl')
 my_instance.save_as_csv()
 my_instance.save_as_pickle()
+
+my_instance.read_pickle()
+
+my_instance.get_boardgame_attrs(name='Scrawl')
+my_instance.get_boardgame_attrs(name='galaxy trucker')
+
+print(my_instance.popular_boardgames(10))
+print(my_instance.popular_recs_filtered(10, num_players=5, playing_time=60))
+
 my_instance.boardgames_data

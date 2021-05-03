@@ -1,5 +1,3 @@
-# Cleaning text exercise
-
 # import statements
 import pandas as pd
 import requests
@@ -10,20 +8,21 @@ import math
 import pickle
 import os
 
-class BoardgameRecommender:
+class BoardgameScrape:
     def __init__(self, number=900):
-        """ Generic distribution class for calculating and
-        visualizing a probability distribution.
+        """ Boardgame Scrape class. It provides the methods to:
+            - parse the Boardgames Geek website
+            - take certain number of boardgames and their attributes and store them to a pandas dataframe
+            - save the parsed data to a csv and/or pickle files
 
         Attributes:
-            mean (float) representing the mean value of the distribution
-            stdev (float) representing the standard deviation of the distribution
-            data_list (list of floats) a list of floats extracted from the data file
-            """
+            boardgames_data (dataframe) gathering all boardgames information
+            number (int) representing the number of boardgames to store in the dataframe
+            root_path (str) current directory
+        """
         self.boardgames_data = []
         self.number = number
         self.root_path = os.path.dirname(os.path.abspath(__file__))
-        #self.scrape_boardgames()
 
     def scrape_boardgames(self):
         '''
@@ -80,8 +79,7 @@ class BoardgameRecommender:
                             del boardgame[1] # delete the title
                             boardgame.append(table.text.split('\t')[0].replace('\n', ''))
                             boardgame.append(math.nan)
-                            boardgame.append(table.text.split('\t')[-3].replace('\n', ''))
-
+                            boardgame.append(math.nan) # failing sometimes as well
                         
                         # get link of the boardgame
                         boargame_link = table.find_all('a', href=True)[0]
@@ -97,7 +95,7 @@ class BoardgameRecommender:
                         #print(heading, 'nothing to do')
 
                 # get other characteristics 
-                boardgame_charac = self.get_boardgame_specifics(boargame_link.attrs['href'])
+                boardgame_charac = self.__get_boardgame_specifics(boargame_link.attrs['href'])
 
                 # put it all together
                 self.boardgames_data.loc[len(self.boardgames_data)] = boardgame + boardgame_charac
@@ -108,7 +106,7 @@ class BoardgameRecommender:
         print(self.boardgames_data.shape)
         print(self.boardgames_data.loc[len(self.boardgames_data)-1])
 
-    def get_boardgame_specifics(self, link):
+    def __get_boardgame_specifics(self, link):
         '''
 
         '''
@@ -221,20 +219,26 @@ class BoardgameRecommender:
     def save_as_csv(self, output_name='data\\boardgame_data.csv'):
         '''
         '''
-
-        file_abs_path = self.root_path + '\\' + output_name
-
-        # Export the data to csv
-        self.boardgames_data.to_csv(file_abs_path)
+        # check if the boardgames list is empty
+        if(self.boardgames_data):
+            # get absolute path
+            file_abs_path = self.root_path + '\\' + output_name
+            # Export the data to csv
+            self.boardgames_data.to_csv(file_abs_path)
+        else:
+            print('ERROR - boardgames dataframe is empty, dataframe couln\'t be saved')
     
     def save_as_pickle(self, output_name = 'data\\boardgame_data.pickle'):
         '''
         '''
-
-        file_abs_path = self.root_path + '\\' + output_name
-
-        # Export the data to pickle
-        self.boardgames_data.to_pickle(file_abs_path)
+        # check if the boardgames list is empty
+        if(self.boardgames_data):
+            # get absolute path
+            file_abs_path = self.root_path + '\\' + output_name
+            # Export the data to pickle
+            self.boardgames_data.to_pickle(file_abs_path)
+        else:
+            print('ERROR - boardgames dataframe is empty, dataframe couln\'t be saved')
     
     def read_pickle(self, file = 'data\\boardgame_data.pickle'):
         
@@ -245,64 +249,3 @@ class BoardgameRecommender:
 
         self.number = self.boardgames_data.shape[0]
         print('Reading boardgame database containing {} entries'.format(self.number))
-
-
-    def popular_boardgames(self, n_top):
-        '''
-        INPUT:
-        n_top - an integer of the number recommendations you want back
-        OUTPUT:
-        top_boardgames - a list of the n_top ranked boardgames by title in order best to worst
-        '''
-
-        top_boardgames = list(self.boardgames_data['Title'][:n_top])
-
-        return top_boardgames  # a list of the n_top movies as recommended
-
-    def popular_recs_filtered(self, n_top, num_players=None, playing_time=None, genres=None):
-        '''
-        REDO THIS DOC STRING
-
-        INPUT:
-        n_top - an integer of the number recommendations you want back
-        //ranked_movies - a pandas dataframe of the already ranked movies based on avg rating, count, and time
-        num_players - a list of strings with years of movies
-        playing_time - an integer of the approximate game duration
-        genres - a list of strings with genres of boardgames
-
-        OUTPUT:
-        top_movies - a list of the n_top recommended boardgames by title in order best to worst
-        '''
-
-        filtered_boardgames = self.boardgames_data.copy(deep=True)
-
-        # Filter movies based on year and genre
-        if num_players is not None:
-            filtered_boardgames = filtered_boardgames[\
-                (filtered_boardgames['Num Players Min'].astype(int) <= num_players) &\
-                     (filtered_boardgames['Num Players Max'].astype(int) >= num_players)]
-
-        if playing_time is not None:
-            filtered_boardgames = filtered_boardgames[\
-                #(filtered_boardgames['Playtime Min'].astype(int) <= playing_time) &\
-                    filtered_boardgames['Playtime Max'].astype(int) <= playing_time]
-
-        # create top movies list
-        top_boardgames = list(filtered_boardgames['Title'][:n_top])
-
-        return top_boardgames
-
-my_instance = BoardgameRecommender(5000)
-my_instance.scrape_boardgames()
-my_instance.save_as_csv()
-my_instance.save_as_pickle()
-
-my_instance.read_pickle()
-
-my_instance.get_boardgame_attrs(name='Scrawl')
-my_instance.get_boardgame_attrs(name='galaxy trucker')
-
-print(my_instance.popular_boardgames(10))
-print(my_instance.popular_recs_filtered(10, num_players=5, playing_time=60))
-
-my_instance.boardgames_data

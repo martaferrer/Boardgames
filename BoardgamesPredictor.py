@@ -3,23 +3,18 @@ The script takes the database file path and model file path, creates and trains 
 into a pickle file to the specified model file path.
 
 This file:
- Loads data from the SQLite database
+ Loads data
  Splits the dataset into training and test sets
- Builds a text processing and machine learning pipeline that uses NLTK, scikit-learn's Pipeline and GridSearchCV
+ Builds a text processing and machine learning pipeline that uses scikit-learn's Pipeline and GridSearchCV
  Trains and tunes a model using GridSearchCV
- Outputs results on the test set: a final model that uses the message column to predict classifications for 36 categories
+ Outputs results on the test set
  Exports the final model as a pickle file
 '''
 
 # import libraries
-import sys
-from sqlalchemy import create_engine
 import pandas as pd
-import re
 import pickle
 import numpy as np
-import math
-import matplotlib.pyplot as plt
 
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
@@ -36,23 +31,20 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.preprocessing import StandardScaler
 
-class Descr_df(object):
-    """
-    TODO
-    """
+class DescriptionClass(object):
     def transform (self, X):
         """
         Display some features of the dataset
         """
-        #print ("Structure of the data: \n {}".format(X.head(5)))
-        #print ("Features names: \n {}".format(X.columns))
+        print ("Structure of the data: \n {}".format(X.head(5)))
+        print ("Features names: \n {}".format(X.columns))
         print ("Shape of the data: \n {}".format(X.shape))
         return X
 
     def fit(self, X, y=None):
         return self
 
-class Fillna(object):
+class FillnaClass(object):
     """
     TODO
     """
@@ -60,7 +52,6 @@ class Fillna(object):
         """
         fillna with 0 (from dummy columns with 0)
         """
-
         X = X.fillna(0)
         return X
 
@@ -69,12 +60,12 @@ class Fillna(object):
 
 def load_database(database_filepath):
     """
-    This function load the message database.
+    This function load the boardgames database.
 
-    :param database_filepath: filepath of the disaster messages database
-    :return: X: text message column
-             y: categories
-             category_names: name of each category column
+    :param:  database_filepath: filepath of the boardgames database
+    :return: X: boardgames features column
+             y: boardgames average rating
+             featured_col: name of each column
     """
     # read clean data pickle
     df = pd.read_pickle(database_filepath)
@@ -92,13 +83,13 @@ def build_regression_model(model_name):
     """ Build the pipeline MultipleLinearRegression including
     filling na values and implementing a grid search.
 
-    pipeline : the custom made pipeline
-    is_grid_search_present : flag showing if a grid search is done
+    :param:  model_name: string conteining the name of the model to train
+    :return: pipeline: the custom made pipeline
+             is_grid_search_present: flag showing if a grid search is done
     """
-
     pipeline = Pipeline(steps=[
-        #('DataframeDescription', Descr_df()),
-        ('FillNa', Fillna()),
+        #('DataframeDescription', DescriptionClass()),
+        ('FillNa', FillnaClass()),
         (model_name, LinearRegression())
     ])
 
@@ -109,13 +100,13 @@ def build_decision_tree_model(model_name):
     """ Build the pipeline DecisionTreeRegressor including
     filling na values and implementing a grid search.
 
-    pipeline : the custom made pipeline
-    is_grid_search_present : flag showing if a grid search is done
+    :param:  model_name: string conteining the name of the model to train
+    :return: pipeline: the custom made pipeline
+             is_grid_search_present: flag showing if a grid search is done
     """
-
     pipeline = Pipeline(steps=[
-        #('DataframeDescription', Descr_df()),
-        ('FillNa', Fillna()),
+        #('DataframeDescription', DescriptionClass()),
+        ('FillNa', FillnaClass()),
         ('dec_tree', DecisionTreeRegressor())
     ])
 
@@ -132,17 +123,13 @@ def build_random_forest_regressor_model(model_name):
     """ Build the pipeline RandomForestRegressor including
     filling na values and implementing a grid search.
     
-    Args:
-        None
-
-    Returns:
-        pipeline: the custom made pipeline
-        is_grid_search_present: flag showing if a grid search is done
+    :param:  model_name: string conteining the name of the model to train
+    :return: pipeline: the custom made pipeline
+             is_grid_search_present: flag showing if a grid search is done
     """
-
     pipeline = Pipeline(steps=[
-        #('DataframeDescription', Descr_df()),
-        ('FillNa', Fillna()),
+        #('DataframeDescription', DescriptionClass()),
+        ('FillNa', FillnaClass()),
         #('scaler', StandardScaler()),
         ('forest_regressor', RandomForestRegressor(random_state=11))
     ])
@@ -169,24 +156,31 @@ def evaluate_model(model, X_test, Y_test, input_col):
     # calculate the Mean Squared Error (MSE)
     # MSE penalizes large errors.
     mse = mean_squared_error(Y_pred, Y_test)
-    print("Mean Square Error is {}".format(np.round(mse, 3)))
+    print("Mean Square Error is {}".format(np.round(mse, 3)), file=output_file)
 
     # calculate the Mean Squared Error (MSE)
     # MSE penalizes large errors.
     mae = mean_absolute_error(Y_pred, Y_test)
-    print("Mean Absolute Error is {}".format(np.round(mae, 3)))
+    print("Mean Absolute Error is {}".format(np.round(mae, 3)), file=output_file)
    
 
 def print_coeficients(model, model_name, input_col):
-    """
+    """ It prints the the importance of each feature when traning the model.
     """
     try:
-        # pair the feature names with the coefficients
-        coefs = list(zip(input_col, model.named_steps[model_name].coef_))
+        # pair the feature names with the coefficients/features importances
+        if(model_name == 'LinearRegression'):
+            coefs = list(zip(input_col, model.named_steps[model_name].coef_))
+        elif(model_name == 'DecisionTree'):
+            coefs = list(zip(input_col, model.best_estimator_.named_steps['dec_tree'].feature_importances_))
+        elif(model_name == 'RandomForest'):
+            coefs = list(zip(input_col, model.best_estimator_.named_steps['forest_regressor'].feature_importances_))
+        else:
+            print('Invalid model {}'.format(model_name), file=output_file)
         coefs.sort(key= lambda x:x[1], reverse=True)
-        print(coefs)
+        print(coefs, file=output_file)
     except:
-        print('Couldn\'t get coeficients - {} '.format(model_name))
+        print('Couldn\'t get coeficients - {} model'.format(model_name), file=output_file)
 
 
 def get_cv_scores(model, X_train, y_train):
@@ -212,65 +206,79 @@ def save_model(model, model_filepath):
 
 
 
+
+""" output_file = open('boargmae_predictor_logs.txt','w')
+
 model_dict = {
-    #'LinearRegression': build_regression_model,
-    #'DecisionTree': build_decision_tree_model,
+    'LinearRegression': build_regression_model,
+    'DecisionTree': build_decision_tree_model,
     'RandomForest': build_random_forest_regressor_model
 }
 
 # load and prepare data for modelling 
 database_filepath = 'Boardgame\\data\\boardgame_data_clean.pkl'
+print('Loading data...', file=output_file)
 X, Y, features = load_database(database_filepath)
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2)
 
 for model_name in model_dict:
-    print('Building {} model...'.format(model_name))
+    print('Building {} model...'.format(model_name), file=output_file)
     model, is_grid_search_present = model_dict[model_name](model_name)
     
-    print('Training model...')
+    print('Training model...', file=output_file)
     #get_cv_scores(model, X_train, Y_train)
     grid_result = model.fit(X_train, Y_train)
 
     if(is_grid_search_present):
-        print('Best Score: ', grid_result.best_score_)
-        print('Best Params: ', grid_result.best_params_)
+        print('Best Score: ', grid_result.best_score_, file=output_file)
+        print('Best Params: ', grid_result.best_params_, file=output_file)
 
-    print('Evaluating model...')
+    print('Evaluating model...', file=output_file)
     print_coeficients(model, model_name, features)
     evaluate_model(model, X_test, Y_test, features)
-    print('Done')
+    print('Done', file=output_file)
 
 
+output_file.close() """
+output_file = open('boargmae_predictor_logs.txt','w')
 
-""" def main():
-    if len(sys.argv) == 0:
-        #database_filepath, model_filepath = sys.argv[1:]
-        database_filepath = 'Boardgame\\data\\boardgame_data_clean.pkl'
-        X, Y, features = load_database(database_filepath)
-        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2)
+def main():
+    
+    
+    # regression algorithms 
+    model_dict = {
+        'LinearRegression': build_regression_model,
+        'DecisionTree': build_decision_tree_model,
+        'RandomForest': build_random_forest_regressor_model
+    }
 
-        print('Building model...')
-        model = build_model()
+    # load and prepare data for modelling 
+    database_filepath = 'Boardgame\\data\\boardgame_data_clean.pkl'
+    print('Loading data...', file=output_file)
+    X, Y, features = load_database(database_filepath)
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2)
 
-        print('Training model...')
-        model.fit(X_train, Y_train)
 
-        print('Evaluating model...')
-        evaluate_model(model, X_test, Y_test, category_names)
+    for model_name in model_dict:
+        print('Building {} model...'.format(model_name), file=output_file)
+        model, is_grid_search_present = model_dict[model_name](model_name)
+        
+        print('Training model...', file=output_file)
+        #get_cv_scores(model, X_train, Y_train)
+        grid_result = model.fit(X_train, Y_train)
 
-        print('Saving model...\n    MODEL: {}'.format(model_filepath))
-        save_model(model, model_filepath)
+        if(is_grid_search_present):
+            print('Best Score: ', grid_result.best_score_, file=output_file)
+            print('Best Params: ', grid_result.best_params_, file=output_file)
 
-        print('Trained model saved!')
+        print('Evaluating model...', file=output_file)
+        print_coeficients(model, model_name, features)
+        evaluate_model(model, X_test, Y_test, features)
+        print('Done', file=output_file)
 
-    else:
-        print('Please provide the filepath of the disaster messages database '
-              'as the first argument and the filepath of the pickle file to '
-              'save the model to as the second argument. \n\nExample: python '
-              'train_classifier.py ../data/DisasterResponse.db classifier.pkl')
+    output_file.close()
 
 if __name__ == '__main__':
     main()
 
- """
 

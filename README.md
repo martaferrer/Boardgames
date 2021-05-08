@@ -31,7 +31,7 @@ The predictor is based on a regression machine learning algorithm including:
  * Random forest regressor
 After running the script and output text file will be created with the outcomes from the models.
 ### 5. Explain your findings with others
-A Medium blog is available where all the findings are explained. 
+A Medium blog is available [here](https://mferresu.medium.com/lets-play-60b2993df65a) explining some of the performed steps and obtained results. 
 
 ## Project structure
 
